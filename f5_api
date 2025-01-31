@@ -113,7 +113,7 @@ class VIPManager(F5BigIP):
         return self._make_request("post", uri, data)
 
 
-# Example Usage
+""" Example Usage
 if __name__ == "__main__":
     # Initialize the F5 BIG-IP connection
     f5 = F5BigIP(host="192.168.1.1", username="admin", password="admin")
@@ -132,3 +132,4 @@ if __name__ == "__main__":
     vip_manager = VIPManager(host="192.168.1.1", username="admin", password="admin")
     print("VIPs:", vip_manager.find_vips())
     print("Create VIP:", vip_manager.create_vip("vs-test", "1.1.1.1:443", "test_pool"))
+"""
