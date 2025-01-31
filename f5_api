@@ -1,163 +1,134 @@
 import json
+import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# Disable SSL warnings (not recommended for production)
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-import urllib
 
-class token:
-        def __init__(self,token):
-                self.token=token
-class host:
-        def __init__(self,host):
-                self.host=host
-class user:
-        def __init__(self,user,password,host):
-                self.user=user
-                self.password=password
-                self.host=host
-        def login(self):
-                data={'username':self.user,'password':self.password,"loginProviderName": "tmos"}
-                rest_url="https://%s/mgmt/shared/authn/login"%(self.host)
-                header={'content-type': 'application/json'}
-                response=requests.post(url=rest_url,headers=header,data=json.dumps(data),verify=False)
-                r_json=json.loads(response.content)
-                try:
-                        self.token=r_json['token']['token']
 
-                        t.token=self.token
-                        h.host=self.host
-                except Exception as e:
-                        raise("Access Failed")
+class F5BigIP:
+    """Base class for interacting with F5 BIG-IP REST API."""
 
-        def failover(self):
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                data={}
-                uri='/mgmt/tm/cm/failover-status'
-                method='get'
-                response=base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return r_json
-class node:
+    def __init__(self, host, username, password):
+        self.host = host
+        self.username = username
+        self.password = password
+        self.token = None
+        self.login()
 
-        def find_nodes(self):
-                """all nodes will be listed in json"""
-                data={}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                uri='/mgmt/tm/ltm/node'
-                method='get'
-                response=base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return r_json
+    def _make_request(self, method, uri, data=None):
+        """Helper method to make HTTP requests."""
+        url = f"https://{self.host}{uri}"
+        headers = {
+            "content-type": "application/json",
+            "X-F5-Auth-Token": self.token
+        }
+        response = requests.request(
+            method, url, headers=headers, data=json.dumps(data), verify=False
+        )
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json()
 
-        def create_node(self,name,address):
-                 data={"name":name,"partition":"Common","address":adress}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                uri='/mgmt/tm/ltm/node'
-                method='post'
-                response=base_api(uri,header,data,method)
-                return response.content
+    def login(self):
+        """Authenticate and retrieve the token."""
+        uri = "/mgmt/shared/authn/login"
+        data = {
+            "username": self.username,
+            "password": self.password,
+            "loginProviderName": "tmos"
+        }
+        response = self._make_request("post", uri, data)
+        self.token = response["token"]["token"]
 
-        def disable_node(self):
-                data={"session":"user-disabled"}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                uri='/mgmt/tm/ltm/node/test_node'
-                method='patch'
-                response=self.base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
+    def failover_status(self):
+        """Get the failover status of the device."""
+        uri = "/mgmt/tm/cm/failover-status"
+        return self._make_request("get", uri)
 
-        def enable_node(self):
-                data={"session":"user-enabled"}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                uri='/mgmt/tm/ltm/node/test_node'
-                method='patch'
-                response=base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
-        def add_node_to_pool(self):
-                data={"name":"/Common/test_node:80"}
-                response=base_api('/mgmt/tm/ltm/pool/test_pool/members',token,data)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
 
-        def disable_node_from_pool(self):
-                data={"session":"user-disabled"}
-                response=base_api('/mgmt/tm/ltm/pool/test_pool/members/~Common~test_node:80',token,data)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
-        def enable_node_from_pool(self):
-                data={"session":"user-enabled"}
-                response=base_api('/mgmt/tm/ltm/pool/test_pool/members/~Common~test_node:80',token,data)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
-class pool:
-        def find_pools(self):
-                uri='/mgmt/tm/ltm/pool'
-                  header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                  data={}
-                  method='get'
-                  response=base_api(uri,header,data,method)
-                  r_json=json.loads(response.content)
-                  return r_json
-        def create_pool(self):
-                  data={"name":"test_pool","partition":"Common","monitor":"/Common/http","members":"test_node:80"}
-                  header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                  uri='/mgmt/tm/ltm/pool'
-                  method='post'
-                  response=base_api(uri,header,data,method)
-                  r_json=json.loads(response.content  )
-                  return json.dumps(r_json,indent=4)
-                  
-                  
-class datagroup:
-          def find_data_groups(self):
-                """all data groups will be listed in json"""
-                uri='/mgmt/tm/ltm/data-group/internal'
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                data={}
-                param={}
-                method='get'
-                response=self.base_api(uri,header,data,param,method)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
-          def add_ip_datagroup(self):                
-                params = (('options', 'records add { 1.2.3.5/32 }'),)
-                data= {"name":"test"}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                uri='/mgmt/tm/ltm/data-group/internal/%s'%('test')
-                method='patch'
-                response=self.base_api(uri,header,data,params,method)
-                r_json=json.loads(response.content)
-                return json.dumps(r_json,indent=4)
-class vip:
-          def find_vips(self):
-                uri='/mgmt/tm/ltm/virtual/?options=destination'
-                header={'content-type': 'application/json',"X-F5-Auth-Token":t.token}
-                data={}
-                method='get'
-                response=base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return r_json
-                
-                
-                
-           def create_vip(self):
-                data={"partition":"Common","name": "vs-test", "destination":"1.1.1.1:443","pool":"test_pool"}
-                header={'content-type': 'application/json',"X-F5-Auth-Token":self.token}
-                method='post'
-                uri='/mgmt/tm/ltm/virtual/'
-                response=base_api(uri,header,data,method)
-                r_json=json.loads(response.content)
-                return r_json
-                
-                
-t=token('')
-h=host('')
-def base_api(uri,header,data,method):
-      rest_url="https://%s%s"%(h.host,uri)
-      print rest_url
-      if method=='get':
-      response=requests.get(url=rest_url,headers=header,verify=False)
-      return response
-      if method=='post':
-      response=requests.post(url=rest_url,headers=header,data=json.dumps(data),verify=False)
-      return response
+class NodeManager(F5BigIP):
+    """Class for managing nodes on the F5 BIG-IP device."""
+
+    def find_nodes(self):
+        """Fetch all nodes in JSON format."""
+        uri = "/mgmt/tm/ltm/node"
+        return self._make_request("get", uri)
+
+    def create_node(self, name, address):
+        """Create a new node."""
+        uri = "/mgmt/tm/ltm/node"
+        data = {"name": name, "partition": "Common", "address": address}
+        return self._make_request("post", uri, data)
+
+    def disable_node(self, node_name):
+        """Disable a specific node."""
+        uri = f"/mgmt/tm/ltm/node/{node_name}"
+        data = {"session": "user-disabled"}
+        return self._make_request("patch", uri, data)
+
+    def enable_node(self, node_name):
+        """Enable a specific node."""
+        uri = f"/mgmt/tm/ltm/node/{node_name}"
+        data = {"session": "user-enabled"}
+        return self._make_request("patch", uri, data)
+
+
+class PoolManager(F5BigIP):
+    """Class for managing pools on the F5 BIG-IP device."""
+
+    def find_pools(self):
+        """Fetch all pools in JSON format."""
+        uri = "/mgmt/tm/ltm/pool"
+        return self._make_request("get", uri)
+
+    def create_pool(self, name, monitor="http", members=None):
+        """Create a new pool."""
+        uri = "/mgmt/tm/ltm/pool"
+        data = {
+            "name": name,
+            "partition": "Common",
+            "monitor": f"/Common/{monitor}",
+            "members": members or []
+        }
+        return self._make_request("post", uri, data)
+
+
+class VIPManager(F5BigIP):
+    """Class for managing Virtual IPs (VIPs) on the F5 BIG-IP device."""
+
+    def find_vips(self):
+        """Fetch all VIPs in JSON format."""
+        uri = "/mgmt/tm/ltm/virtual/?options=destination"
+        return self._make_request("get", uri)
+
+    def create_vip(self, name, destination, pool):
+        """Create a new VIP."""
+        uri = "/mgmt/tm/ltm/virtual"
+        data = {
+            "partition": "Common",
+            "name": name,
+            "destination": destination,
+            "pool": pool
+        }
+        return self._make_request("post", uri, data)
+
+
+# Example Usage
+if __name__ == "__main__":
+    # Initialize the F5 BIG-IP connection
+    f5 = F5BigIP(host="192.168.1.1", username="admin", password="admin")
+
+    # Manage nodes
+    node_manager = NodeManager(host="192.168.1.1", username="admin", password="admin")
+    print("Nodes:", node_manager.find_nodes())
+    print("Create Node:", node_manager.create_node("test_node", "192.168.1.100"))
+
+    # Manage pools
+    pool_manager = PoolManager(host="192.168.1.1", username="admin", password="admin")
+    print("Pools:", pool_manager.find_pools())
+    print("Create Pool:", pool_manager.create_pool("test_pool", members=["test_node:80"]))
+
+    # Manage VIPs
+    vip_manager = VIPManager(host="192.168.1.1", username="admin", password="admin")
+    print("VIPs:", vip_manager.find_vips())
+    print("Create VIP:", vip_manager.create_vip("vs-test", "1.1.1.1:443", "test_pool"))
